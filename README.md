@@ -12,3 +12,4 @@ React + Vite admin panel — Phase 4 (Week 10–12)
 - Coupon management — discounts, expiry, usage limits
 - Reports & analytics — revenue reports, CSV export
 - User management — view customers, ban/unban
+
