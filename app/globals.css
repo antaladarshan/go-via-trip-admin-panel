@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Light theme (default) ── */
+:root {
+  --color-bg:             249 249 249;   /* #f9f9f9 */
+  --color-surface:        255 255 255;   /* #ffffff */
+  --color-surface-2:      243 243 243;   /* #f3f3f3 */
+  --color-text:            26  28  28;   /* #1a1c1c */
+  --color-text-secondary:  95  94  94;   /* #5f5e5e */
+  --color-border:         226 226 226;   /* #e2e2e2 */
+  --color-border-warm:    240 196 160;   /* #F0C4A0 orange-warm */
+
+  /* Brand — override these via env / inline style to white-label */
+  --color-brand:      244 125 31;   /* #F47D1F GoViaTrip orange */
+  --color-brand-dark: 220 113 28;   /* #DC711C */
+
+  /* Semantic status tokens — override to re-skin status chips */
+  --color-success:  21 128  61;   /* #15803d */
+  --color-warning: 234  88  12;   /* #ea580c */
+  --color-danger:  186  26  26;   /* #ba1a1a */
+}
+
+/* ── Dark theme ── */
+.dark {
+  --color-bg:            15  17  19;   /* #0f1113 */
+  --color-surface:       26  28  31;   /* #1a1c1f */
+  --color-surface-2:     36  39  43;   /* #24272b */
+  --color-text:         237 238 240;   /* #edeef0 */
+  --color-text-secondary: 148 152 158; /* #94989e */
+  --color-border:        52  56  62;   /* #34383e */
+  --color-border-warm:   77  56  32;   /* #4d3820 orange-warm dark */
+
+  /* Brand stays the same in dark — override if desired */
+  --color-brand:      244 125 31;
+  --color-brand-dark: 220 113 28;
+
+  --color-success:  21 128  61;
+  --color-warning: 234  88  12;
+  --color-danger:  186  26  26;
+}
+
+@layer base {
+  body {
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
