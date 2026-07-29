@@ -17,8 +17,8 @@ export default function UserBookingHistoryDrawer({ user, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAllBookingsAdminApi()
-      .then(all => setBookings(all.filter(b => b.customer_id === user.id)))
+    getAllBookingsAdminApi({ customer_id: user.id, pageSize: 100 })
+      .then(res => setBookings(res.bookings))
       .finally(() => setLoading(false));
   }, [user.id]);
 

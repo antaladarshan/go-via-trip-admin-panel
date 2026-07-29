@@ -280,11 +280,50 @@ export interface AdminBooking {
   created_at: string;
 }
 
-export async function getAllBookingsAdminApi(): Promise<AdminBooking[]> {
-  const res = await apiFetch(`${BASE_URL}/bookings`, { credentials: 'include' });
+export interface AdminBookingsParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  status?: AdminBookingStatus;
+  vendor_id?: string;
+  category_id?: string;
+  customer_id?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface AdminBookingsResult {
+  bookings: AdminBooking[];
+  total: number;
+  page: number;
+  pageSize: number;
+  vendors: { id: string; name: string }[];
+  categories: { id: string; name: string }[];
+}
+
+export async function getAllBookingsAdminApi(params: AdminBookingsParams = {}): Promise<AdminBookingsResult> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+  if (params.q) qs.set('q', params.q);
+  if (params.status) qs.set('status', params.status);
+  if (params.vendor_id) qs.set('vendor_id', params.vendor_id);
+  if (params.category_id) qs.set('category_id', params.category_id);
+  if (params.customer_id) qs.set('customer_id', params.customer_id);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await apiFetch(`${BASE_URL}/admin/bookings${suffix}`, { credentials: 'include' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message ?? 'Failed to load bookings');
-  return data.bookings ?? [];
+  return {
+    bookings: data.bookings ?? [],
+    total: data.total ?? 0,
+    page: data.page ?? 1,
+    pageSize: data.pageSize ?? 15,
+    vendors: data.vendors ?? [],
+    categories: data.categories ?? [],
+  };
 }
 
 export async function updateBookingStatusAdminApi(id: string, status: AdminBookingStatus): Promise<AdminBooking> {

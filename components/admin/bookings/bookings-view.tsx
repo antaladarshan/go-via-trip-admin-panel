@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, Calendar, BookOpen } from 'lucide-react';
 import { useT, useLocalization } from '@/lib/i18n/localization-context';
 import {
@@ -25,8 +25,12 @@ export default function BookingsView() {
   const { formatMoney } = useLocalization();
 
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [vendorOptions, setVendorOptions] = useState<{ id: string; name: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [vendorFilter, setVendorFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -36,46 +40,50 @@ export default function BookingsView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<AdminBooking | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  // Debounce the free-text search so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300);
+    return () => clearTimeout(id);
+  }, [search]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      setBookings(await getAllBookingsAdminApi());
-    } finally {
-      setLoading(false);
-    }
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // The filter arguments shared by the table load and the CSV export.
+  function currentFilters() {
+    return {
+      q: debouncedSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      vendor_id: vendorFilter || undefined,
+      category_id: categoryFilter || undefined,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
+    };
   }
 
-  const vendorOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const b of bookings) if (!seen.has(b.vendor_id)) seen.set(b.vendor_id, b.vendor_name);
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  }, [bookings]);
-
-  const categoryOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const b of bookings) if (b.category_id && !seen.has(b.category_id)) seen.set(b.category_id, b.category_name ?? '');
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  }, [bookings]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return bookings.filter(b => {
-      if (q && !b.booking_code?.toLowerCase().includes(q) && !b.customer_name.toLowerCase().includes(q) && !b.listing_title.toLowerCase().includes(q)) return false;
-      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
-      if (vendorFilter && b.vendor_id !== vendorFilter) return false;
-      if (categoryFilter && b.category_id !== categoryFilter) return false;
-      if (dateFrom && b.start_date < dateFrom) return false;
-      if (dateTo && b.start_date > dateTo) return false;
-      return true;
-    });
-  }, [bookings, search, statusFilter, vendorFilter, categoryFilter, dateFrom, dateTo]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  // Reload from the server whenever a filter or the page changes.
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await getAllBookingsAdminApi({ page, pageSize: PAGE_SIZE, ...currentFilters() });
+        if (cancelled) return;
+        setBookings(res.bookings);
+        setTotal(res.total);
+        setVendorOptions(res.vendors);
+        setCategoryOptions(res.categories);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('bookings.updateFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, statusFilter, vendorFilter, categoryFilter, dateFrom, dateTo, t]);
 
   async function advanceStatus(b: AdminBooking) {
     const next: AdminBookingStatus = b.status === 'pending' ? 'confirmed' : 'completed';
@@ -97,21 +105,30 @@ export default function BookingsView() {
     setCancelling(null);
   }
 
-  function exportCsv() {
-    const headers = ['Booking ID', 'Customer', 'Vendor', 'Experience', 'Category', 'Date', 'Pax', 'Amount', 'Status', 'Refund Status'];
-    const rows = filtered.map(b => [
-      b.booking_code ?? b.id, b.customer_name, b.vendor_name, b.listing_title,
-      b.category_name ?? '', b.start_date, String(b.pax_count),
-      formatMoney(Number(b.total_price)), b.status, b.refund_status,
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `admin-bookings-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Export every booking matching the current filters (not just the loaded page).
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const res = await getAllBookingsAdminApi({ page: 1, pageSize: 1000, ...currentFilters() });
+      const headers = ['Booking ID', 'Customer', 'Vendor', 'Experience', 'Category', 'Date', 'Pax', 'Amount', 'Status', 'Refund Status'];
+      const rows = res.bookings.map(b => [
+        b.booking_code ?? b.id, b.customer_name, b.vendor_name, b.listing_title,
+        b.category_name ?? '', b.start_date, String(b.pax_count),
+        formatMoney(Number(b.total_price)), b.status, b.refund_status,
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `admin-bookings-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('bookings.updateFailed'));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -123,7 +140,8 @@ export default function BookingsView() {
         </div>
         <button
           onClick={exportCsv}
-          className="flex items-center gap-2 border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 text-[13px] font-medium px-4 py-2 rounded-lg transition-colors"
+          disabled={exporting}
+          className="flex items-center gap-2 border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 text-[13px] font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           <Download className="w-4 h-4" />
           {t('bookings.exportCsv')}
@@ -143,7 +161,7 @@ export default function BookingsView() {
             <input
               type="text"
               value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              onChange={e => setSearch(e.target.value)}
               placeholder={t('bookings.searchPlaceholder')}
               className="w-full pl-9 pr-4 py-2 border border-neutral-border rounded-lg text-[13px] outline-none focus:ring-2 bg-surface text-neutral-primary focus:border-brand-red/50 focus:ring-brand-red/20"
             />
@@ -208,7 +226,7 @@ export default function BookingsView() {
           <div className="flex justify-center py-16">
             <div className="w-7 h-7 rounded-full border-2 border-brand-red border-t-transparent animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : bookings.length === 0 ? (
           <div className="text-center py-16">
             <BookOpen className="w-8 h-8 text-neutral-secondary mx-auto mb-2" />
             <p className="text-[15px] font-semibold text-neutral-primary">{t('bookings.emptyTitle')}</p>
@@ -229,7 +247,7 @@ export default function BookingsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-border">
-                {pageItems.map(b => (
+                {bookings.map(b => (
                   <tr key={b.id} className="text-[13px] text-neutral-primary hover:bg-surface-2 transition-colors">
                     <td className="p-4 font-medium">{b.booking_code ?? b.id.slice(0, 8)}</td>
                     <td className="p-4">
@@ -276,43 +294,45 @@ export default function BookingsView() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {!loading && total > 0 && (
           <div className="px-4 py-3 border-t border-neutral-border bg-surface flex items-center justify-between flex-wrap gap-2">
             <span className="text-[13px] text-neutral-secondary">
               {t('bookings.showingEntries')
-                .replace('{from}', String((safePage - 1) * PAGE_SIZE + 1))
-                .replace('{to}', String(Math.min(safePage * PAGE_SIZE, filtered.length)))
-                .replace('{total}', String(filtered.length))}
+                .replace('{from}', String((page - 1) * PAGE_SIZE + 1))
+                .replace('{to}', String(Math.min(page * PAGE_SIZE, total)))
+                .replace('{total}', String(total))}
             </span>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="p-2 rounded-lg border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 transition-colors disabled:opacity-40"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(n => Math.abs(n - safePage) <= 2)
-                .map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    className={`w-9 h-9 rounded-lg text-[13px] font-medium transition-colors border ${
-                      n === safePage ? 'bg-brand-red text-white border-brand-red' : 'border-neutral-border text-neutral-secondary hover:bg-surface-2'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                className="p-2 rounded-lg border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 transition-colors disabled:opacity-40"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-2 rounded-lg border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 transition-colors disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(n => Math.abs(n - page) <= 2)
+                  .map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setPage(n)}
+                      className={`w-9 h-9 rounded-lg text-[13px] font-medium transition-colors border ${
+                        n === page ? 'bg-brand-red text-white border-brand-red' : 'border-neutral-border text-neutral-secondary hover:bg-surface-2'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-2 rounded-lg border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 transition-colors disabled:opacity-40"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
