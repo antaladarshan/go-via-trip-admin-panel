@@ -6,6 +6,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { BRAND } from '@/lib/brand';
 import Logo from '@/components/brand/logo';
+import TravelAuthBackground from '@/components/brand/travel-auth-background';
 
 export default function AdminLoginPage() {
   const { login } = useAuth();
@@ -36,8 +37,9 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center px-6">
-      <div className="w-full max-w-[400px] flex flex-col gap-7">
+    <div className="relative min-h-screen flex items-center justify-center px-6 py-10">
+      <TravelAuthBackground />
+      <div className="relative z-10 w-full max-w-[420px] flex flex-col gap-7 bg-surface/70 backdrop-blur-xl border border-neutral-border/60 rounded-3xl shadow-2xl p-8 sm:p-9">
         <div>
           <Logo variant="wordmark" className="h-8 w-auto mb-3" />
           <p className="text-[13px] font-semibold text-brand-red tracking-widest uppercase">
