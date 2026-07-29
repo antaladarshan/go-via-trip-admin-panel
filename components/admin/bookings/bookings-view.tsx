@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, Calendar, BookOpen } from 'lucide-react';
 import { useT, useLocalization } from '@/lib/i18n/localization-context';
 import {
-  getAllBookingsAdminApi, updateBookingStatusAdminApi, cancelBookingAdminApi,
+  getAllBookingsAdminApi, updateBookingStatusAdminApi, cancelBookingAdminApi, refundBookingAdminApi,
   type AdminBooking, type AdminBookingStatus,
 } from '@/lib/admin-api';
 import CancelBookingModal from './cancel-booking-modal';
+import RefundBookingModal from './refund-booking-modal';
 
 type StatusFilter = 'all' | AdminBookingStatus;
 const STATUS_FILTERS: StatusFilter[] = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
@@ -39,6 +40,7 @@ export default function BookingsView() {
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<AdminBooking | null>(null);
+  const [refunding, setRefunding] = useState<AdminBooking | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -103,6 +105,13 @@ export default function BookingsView() {
     const updated = await cancelBookingAdminApi(cancelling.id, reason);
     setBookings(prev => prev.map(b => (b.id === cancelling.id ? { ...b, status: updated.status, refund_status: updated.refund_status } : b)));
     setCancelling(null);
+  }
+
+  async function handleRefund() {
+    if (!refunding) return;
+    const updated = await refundBookingAdminApi(refunding.id);
+    setBookings(prev => prev.map(b => (b.id === refunding.id ? { ...b, refund_status: updated.refund_status, refund_amount: updated.refund_amount } : b)));
+    setRefunding(null);
   }
 
   // Export every booking matching the current filters (not just the loaded page).
@@ -285,6 +294,14 @@ export default function BookingsView() {
                             {t('bookings.actionCancel')}
                           </button>
                         )}
+                        {b.paid && (b.refund_status === 'none' || b.refund_status === 'failed') && (
+                          <button
+                            onClick={() => setRefunding(b)}
+                            className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-neutral-border text-neutral-secondary hover:text-neutral-primary hover:bg-surface-2 transition-colors"
+                          >
+                            {b.refund_status === 'failed' ? t('bookings.actionRetryRefund') : t('bookings.actionRefund')}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -342,6 +359,14 @@ export default function BookingsView() {
           booking={cancelling}
           onClose={() => setCancelling(null)}
           onConfirm={handleCancel}
+        />
+      )}
+
+      {refunding && (
+        <RefundBookingModal
+          booking={refunding}
+          onClose={() => setRefunding(null)}
+          onConfirm={handleRefund}
         />
       )}
     </div>

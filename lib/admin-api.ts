@@ -277,6 +277,7 @@ export interface AdminBooking {
   status: AdminBookingStatus;
   refund_status: AdminRefundStatus;
   refund_amount: string | number | null;
+  paid: boolean;
   created_at: string;
 }
 
@@ -347,6 +348,17 @@ export async function cancelBookingAdminApi(id: string, reason?: string): Promis
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message ?? 'Failed to cancel booking');
+  return data.booking;
+}
+
+// Standalone refund: issue/retry a gateway refund without cancelling the booking.
+export async function refundBookingAdminApi(id: string): Promise<AdminBooking> {
+  const res = await apiFetch(`${BASE_URL}/bookings/${id}/refund`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Failed to initiate refund');
   return data.booking;
 }
 
