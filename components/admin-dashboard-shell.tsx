@@ -1,16 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import {
+  LogOut, LayoutDashboard, Menu, X, Store, FolderTree, LayoutList,
+  BookOpen, CreditCard, Tag, BarChart2, Users,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/localization-context';
 import { BRAND } from '@/lib/brand';
 import Logo from '@/components/brand/logo';
 import AdminDashboardView from './dashboard/admin-dashboard-view';
+import VendorsView from './admin/vendors/vendors-view';
+import CategoriesView from './admin/categories/categories-view';
+import ListingsView from './admin/listings/listings-view';
+import BookingsView from './admin/bookings/bookings-view';
+import PaymentsView from './admin/payments/payments-view';
+import CouponsView from './admin/coupons/coupons-view';
+import ReportsView from './admin/reports/reports-view';
+import UsersView from './admin/users/users-view';
 
-// Extend this union as later CRM screens (categories, vendors, listings,
-// bookings, payments, coupons, reports, users) are built.
-type Section = 'dashboard';
+type Section =
+  | 'dashboard' | 'vendors' | 'categories' | 'listings' | 'bookings'
+  | 'payments' | 'coupons' | 'reports' | 'users';
 
 export default function AdminDashboardShell() {
   const { logout, user } = useAuth();
@@ -19,7 +30,15 @@ export default function AdminDashboardShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const NAV_ITEMS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'dashboard', label: t('nav.adminDashboard'), icon: LayoutDashboard },
+    { id: 'dashboard',  label: t('nav.adminDashboard'), icon: LayoutDashboard },
+    { id: 'vendors',    label: t('nav.vendors'),        icon: Store },
+    { id: 'categories', label: t('nav.categories'),     icon: FolderTree },
+    { id: 'listings',   label: t('nav.listings'),       icon: LayoutList },
+    { id: 'bookings',   label: t('nav.bookings'),       icon: BookOpen },
+    { id: 'payments',   label: t('nav.payments'),       icon: CreditCard },
+    { id: 'coupons',    label: t('nav.coupons'),        icon: Tag },
+    { id: 'reports',    label: t('nav.reports'),        icon: BarChart2 },
+    { id: 'users',      label: t('nav.users'),          icon: Users },
   ];
 
   const sidebar = (
@@ -88,7 +107,15 @@ export default function AdminDashboardShell() {
         </div>
 
         <main className="flex-1 overflow-y-auto">
-          {activeSection === 'dashboard' && <AdminDashboardView />}
+          {activeSection === 'dashboard'  && <AdminDashboardView />}
+          {activeSection === 'vendors'    && <VendorsView />}
+          {activeSection === 'categories' && <CategoriesView />}
+          {activeSection === 'listings'   && <ListingsView />}
+          {activeSection === 'bookings'   && <BookingsView />}
+          {activeSection === 'payments'   && <PaymentsView />}
+          {activeSection === 'coupons'    && <CouponsView />}
+          {activeSection === 'reports'    && <ReportsView />}
+          {activeSection === 'users'      && <UsersView />}
         </main>
       </div>
     </div>

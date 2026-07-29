@@ -86,7 +86,7 @@ function CustomTooltip({ active, payload, formatter }: CustomTooltipProps) {
   );
 }
 
-function CategoryBarChart({
+export function CategoryBarChart({
   data, dataKey, hue, valueFormatter, barLabel,
 }: {
   data: CategoryPerformance[];
