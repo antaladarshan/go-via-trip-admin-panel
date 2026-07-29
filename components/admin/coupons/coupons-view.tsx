@@ -82,6 +82,7 @@ export default function CouponsView() {
                 <tr className="bg-surface-2 border-b border-neutral-border text-[11px] font-semibold text-neutral-secondary uppercase tracking-wide">
                   <th className="p-4">{t('coupons.colCode')}</th>
                   <th className="p-4">{t('coupons.colDiscount')}</th>
+                  <th className="p-4">{t('coupons.colCategories')}</th>
                   <th className="p-4">{t('coupons.colUsage')}</th>
                   <th className="p-4">{t('coupons.colValidUntil')}</th>
                   <th className="p-4">{t('bookings.colStatus')}</th>
@@ -96,6 +97,22 @@ export default function CouponsView() {
                       {c.description && <p className="text-[12px] text-neutral-secondary">{c.description}</p>}
                     </td>
                     <td className="p-4">{formatDiscount(c)}</td>
+                    <td className="p-4">
+                      {c.applicable_categories.length === 0 ? (
+                        <span className="text-neutral-secondary">{t('coupons.allCategories')}</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {c.applicable_categories.map(cat => (
+                            <span
+                              key={cat.id}
+                              className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-2 text-neutral-secondary"
+                            >
+                              {cat.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4 text-neutral-secondary">
                       {c.used_count}{c.usage_limit != null ? ` / ${c.usage_limit}` : ''}
                     </td>

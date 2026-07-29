@@ -405,6 +405,7 @@ export interface Coupon {
   usage_limit: number | null;
   used_count: number;
   status: 'active' | 'inactive';
+  applicable_categories: { id: string; name: string }[];
   created_at: string;
 }
 
@@ -417,6 +418,21 @@ export interface CouponPayload {
   max_discount?: number | null;
   valid_until?: string | null;
   usage_limit?: number | null;
+  // Empty array (or omitted) = applies to every category.
+  category_ids?: string[];
+}
+
+// All coupon fields are editable except the immutable `code`.
+export interface CouponUpdatePayload {
+  description?: string;
+  discount_type?: 'percent' | 'flat';
+  discount_value?: number;
+  min_subtotal?: number;
+  max_discount?: number | null;
+  valid_until?: string | null;
+  usage_limit?: number | null;
+  status?: 'active' | 'inactive';
+  category_ids?: string[];
 }
 
 export async function getAllCouponsApi(): Promise<Coupon[]> {
@@ -440,7 +456,7 @@ export async function createCouponApi(payload: CouponPayload): Promise<Coupon> {
 
 export async function updateCouponApi(
   id: string,
-  payload: Partial<Pick<Coupon, 'status' | 'valid_until' | 'usage_limit'>>
+  payload: CouponUpdatePayload
 ): Promise<Coupon> {
   const res = await apiFetch(`${BASE_URL}/coupons/${id}`, {
     method: 'PATCH',
