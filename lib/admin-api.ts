@@ -169,15 +169,46 @@ export interface AdminListingUpdate {
   price?: number;
 }
 
-export async function getAllListingsAdminApi(): Promise<AdminListing[]> {
-  const res = await apiFetch(`${BASE_URL}/admin/listings`, { credentials: 'include' });
+export interface AdminListingsParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  status?: 'active' | 'inactive';
+  vendor_id?: string;
+  featured?: boolean;
+}
+
+export interface AdminListingsResult {
+  listings: AdminListing[];
+  total: number;
+  page: number;
+  pageSize: number;
+  vendors: { id: string; name: string }[];
+}
+
+export async function getAllListingsAdminApi(params: AdminListingsParams = {}): Promise<AdminListingsResult> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+  if (params.q) qs.set('q', params.q);
+  if (params.status) qs.set('status', params.status);
+  if (params.vendor_id) qs.set('vendor_id', params.vendor_id);
+  if (typeof params.featured === 'boolean') qs.set('featured', String(params.featured));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await apiFetch(`${BASE_URL}/admin/listings${suffix}`, { credentials: 'include' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message ?? 'Failed to load listings');
-  return data.listings ?? [];
+  return {
+    listings: data.listings ?? [],
+    total: data.total ?? 0,
+    page: data.page ?? 1,
+    pageSize: data.pageSize ?? 15,
+    vendors: data.vendors ?? [],
+  };
 }
 
 export async function updateListingAdminApi(id: string, payload: AdminListingUpdate): Promise<AdminListing> {
-  const res = await apiFetch(`${BASE_URL}/listings/${id}`, {
+  const res = await apiFetch(`${BASE_URL}/admin/listings/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -188,8 +219,32 @@ export async function updateListingAdminApi(id: string, payload: AdminListingUpd
   return data.listing;
 }
 
+export async function toggleListingFeaturedApi(id: string, featured: boolean): Promise<AdminListing> {
+  const res = await apiFetch(`${BASE_URL}/admin/listings/${id}/feature`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ featured }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Failed to update listing');
+  return data.listing;
+}
+
+export async function assignListingCategoryApi(id: string, category_id: string | null): Promise<AdminListing> {
+  const res = await apiFetch(`${BASE_URL}/admin/listings/${id}/category`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ category_id }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Failed to update listing');
+  return data.listing;
+}
+
 export async function deleteListingAdminApi(id: string): Promise<void> {
-  const res = await apiFetch(`${BASE_URL}/listings/${id}`, { method: 'DELETE', credentials: 'include' });
+  const res = await apiFetch(`${BASE_URL}/admin/listings/${id}`, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error((data as { message?: string }).message ?? 'Failed to delete listing');

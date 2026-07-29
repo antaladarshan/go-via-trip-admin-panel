@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Star, Pencil, Trash2, LayoutList } from 'lucide-react';
 import { useT, useLocalization } from '@/lib/i18n/localization-context';
 import {
-  getAllListingsAdminApi, updateListingAdminApi, deleteListingAdminApi,
+  getAllListingsAdminApi, toggleListingFeaturedApi, deleteListingAdminApi,
   type AdminListing,
 } from '@/lib/admin-api';
 import ListingEditModal from './listing-edit-modal';
@@ -18,8 +18,11 @@ export default function ListingsView() {
   const { formatMoney } = useLocalization();
 
   const [listings, setListings] = useState<AdminListing[]>([]);
+  const [vendorOptions, setVendorOptions] = useState<{ id: string; name: string }[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [vendorFilter, setVendorFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -28,41 +31,58 @@ export default function ListingsView() {
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  useEffect(() => { load(); }, []);
+  // Debounce the free-text search so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300);
+    return () => clearTimeout(id);
+  }, [search]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      setListings(await getAllListingsAdminApi());
-    } finally {
-      setLoading(false);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Reload from the server whenever a filter or the page changes.
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await getAllListingsAdminApi({
+          page,
+          pageSize: PAGE_SIZE,
+          q: debouncedSearch || undefined,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          vendor_id: vendorFilter || undefined,
+        });
+        if (cancelled) return;
+        setListings(res.listings);
+        setTotal(res.total);
+        setVendorOptions(res.vendors);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('listings.updateFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  }
+    load();
+    return () => { cancelled = true; };
+  }, [page, debouncedSearch, statusFilter, vendorFilter, t]);
 
-  const vendorOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const l of listings) if (!seen.has(l.vendor_id)) seen.set(l.vendor_id, l.vendor_name);
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  }, [listings]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return listings.filter(l => {
-      if (q && !l.title.toLowerCase().includes(q) && !l.vendor_name.toLowerCase().includes(q)) return false;
-      if (statusFilter !== 'all' && l.status !== statusFilter) return false;
-      if (vendorFilter && l.vendor_id !== vendorFilter) return false;
-      return true;
+  async function reload() {
+    const res = await getAllListingsAdminApi({
+      page,
+      pageSize: PAGE_SIZE,
+      q: debouncedSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      vendor_id: vendorFilter || undefined,
     });
-  }, [listings, search, statusFilter, vendorFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+    setListings(res.listings);
+    setTotal(res.total);
+    setVendorOptions(res.vendors);
+  }
 
   async function toggleFeatured(l: AdminListing) {
     setTogglingId(l.id);
     try {
-      const updated = await updateListingAdminApi(l.id, { featured: !l.featured });
+      const updated = await toggleListingFeaturedApi(l.id, !l.featured);
       setListings(prev => prev.map(x => (x.id === l.id ? { ...x, featured: updated.featured } : x)));
     } catch (err) {
       setError(err instanceof Error ? err.message : t('listings.updateFailed'));
@@ -75,8 +95,10 @@ export default function ListingsView() {
     if (!deleting) return;
     try {
       await deleteListingAdminApi(deleting.id);
-      setListings(prev => prev.filter(l => l.id !== deleting.id));
       setDeleting(null);
+      // Deleting the last row on a page would leave it empty — step back if so.
+      if (listings.length === 1 && page > 1) setPage(p => p - 1);
+      else await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('listings.deleteFailed'));
     }
@@ -132,7 +154,7 @@ export default function ListingsView() {
           <div className="flex justify-center py-16">
             <div className="w-7 h-7 rounded-full border-2 border-brand-red border-t-transparent animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : listings.length === 0 ? (
           <div className="text-center py-16">
             <LayoutList className="w-8 h-8 text-neutral-secondary mx-auto mb-2" />
             <p className="text-[15px] font-semibold text-neutral-primary">{t('listings.emptyTitle')}</p>
@@ -152,7 +174,7 @@ export default function ListingsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-border">
-                {pageItems.map(l => (
+                {listings.map(l => (
                   <tr key={l.id} className="text-[13px] text-neutral-primary hover:bg-surface-2 transition-colors">
                     <td className="p-4">
                       <button
@@ -198,13 +220,13 @@ export default function ListingsView() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && totalPages > 1 && (
+        {!loading && total > 0 && totalPages > 1 && (
           <div className="px-4 py-3 border-t border-neutral-border bg-surface flex items-center justify-between">
             <span className="text-[13px] text-neutral-secondary">
               {t('listings.showingEntries')
-                .replace('{from}', String((safePage - 1) * PAGE_SIZE + 1))
-                .replace('{to}', String(Math.min(safePage * PAGE_SIZE, filtered.length)))
-                .replace('{total}', String(filtered.length))}
+                .replace('{from}', String((page - 1) * PAGE_SIZE + 1))
+                .replace('{to}', String(Math.min(page * PAGE_SIZE, total)))
+                .replace('{total}', String(total))}
             </span>
             <div className="flex gap-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
@@ -212,7 +234,7 @@ export default function ListingsView() {
                   key={n}
                   onClick={() => setPage(n)}
                   className={`w-9 h-9 rounded-lg text-[13px] font-medium transition-colors border ${
-                    n === safePage ? 'bg-brand-red text-white border-brand-red' : 'border-neutral-border text-neutral-secondary hover:bg-surface-2'
+                    n === page ? 'bg-brand-red text-white border-brand-red' : 'border-neutral-border text-neutral-secondary hover:bg-surface-2'
                   }`}
                 >
                   {n}
