@@ -37,7 +37,10 @@ export default function Logo({
 
   const g = (n: number) => `${uid}p${n}`;
 
-  const viewBox = variant === 'mark' ? '0 0 189 189' : '0 0 669 189';
+  // Artwork's bounding box touches the canvas edges exactly (0,0) with zero margin,
+  // so a small safe-area padding is added here — without it, some renderers (mobile
+  // browsers, screenshot/thumbnail tools, image export) clip a sliver off the top/left.
+  const viewBox = variant === 'mark' ? '-5 -5 199 199' : '-5 -5 679 199';
 
   return (
     <svg
