@@ -16,8 +16,8 @@
   --color-border-warm:    240 196 160;   /* #F0C4A0 orange-warm */
 
   /* Brand — override these via env / inline style to white-label */
-  --color-brand:      244 125 31;   /* #F47D1F GoViaTrip orange */
-  --color-brand-dark: 220 113 28;   /* #DC711C */
+  --color-brand:      250 149 2;    /* #FA9502 Quiliss orange */
+  --color-brand-dark: 254 61 11;    /* #FE3D0B */
 
   /* Semantic status tokens — override to re-skin status chips */
   --color-success:  21 128  61;   /* #15803d */

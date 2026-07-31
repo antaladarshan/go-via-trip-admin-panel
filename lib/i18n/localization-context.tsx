@@ -12,7 +12,7 @@ import {
 } from '@/lib/localization-api';
 import { FALLBACK_EN } from './fallback-en';
 
-const COOKIE_NAME = 'govt_locale';
+const COOKIE_NAME = 'quiliss_locale';
 
 function readLocaleCookie(): { language: string; currency: string } {
   if (typeof document === 'undefined') return { language: 'en', currency: 'INR' };

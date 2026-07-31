@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { subscribe, getSnapshot } from '@/lib/loading-store';
+import Logo from '@/components/brand/logo';
 
 export default function GlobalLoadingOverlay() {
   const visible = useSyncExternalStore(subscribe, getSnapshot, () => false);
@@ -16,7 +17,7 @@ export default function GlobalLoadingOverlay() {
       aria-busy="true"
       aria-label="Loading"
     >
-      <div className="w-10 h-10 rounded-full border-2 border-brand-red border-t-transparent animate-spin" />
+      <Logo variant="mark" aria-label="Loading" className="w-12 h-12 animate-spin drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]" />
     </div>
   );
 }

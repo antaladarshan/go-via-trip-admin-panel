@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   let lang = 'en';
   try {
-    const raw = cookies().get('govt_locale')?.value;
+    const raw = cookies().get('quiliss_locale')?.value;
     if (raw) lang = JSON.parse(decodeURIComponent(raw)).language ?? 'en';
   } catch { /* use default */ }
 

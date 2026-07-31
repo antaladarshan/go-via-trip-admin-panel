@@ -46,7 +46,7 @@ export default function AdminLoginPage() {
             {BRAND.productName}
           </p>
           <p className="mt-1 text-[15px] text-neutral-secondary">
-            Sign in to manage the GoViaTrip platform.
+            Sign in to manage the Quiliss platform.
           </p>
         </div>
 

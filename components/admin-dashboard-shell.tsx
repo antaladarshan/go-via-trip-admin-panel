@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import {
   LogOut, LayoutDashboard, Menu, X, Store, FolderTree, LayoutList,
-  BookOpen, CreditCard, Tag, BarChart2, Users,
+  BookOpen, CreditCard, Tag, BarChart2, Users, Sun, Moon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/localization-context';
@@ -26,8 +27,14 @@ type Section =
 export default function AdminDashboardShell() {
   const { logout, user } = useAuth();
   const t = useT();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const isDark = mounted && resolvedTheme === 'dark';
 
   const NAV_ITEMS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard',  label: t('nav.adminDashboard'), icon: LayoutDashboard },
@@ -62,7 +69,14 @@ export default function AdminDashboardShell() {
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-neutral-border">
+      <div className="px-3 py-4 border-t border-neutral-border space-y-0.5">
+        <button
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-neutral-secondary hover:text-neutral-primary hover:bg-neutral-muted transition-colors"
+        >
+          {isDark ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+          {isDark ? 'Light mode' : 'Dark mode'}
+        </button>
         <button
           onClick={() => logout()}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-neutral-secondary hover:text-neutral-primary hover:bg-neutral-muted transition-colors"
