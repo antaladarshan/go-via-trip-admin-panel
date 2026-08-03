@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang={lang} className={`${inter.variable} ${interTight.variable}`} suppressHydrationWarning>
       <body className="bg-bg text-neutral-primary font-sans" style={brandStyle}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">
           <AuthProvider>
             <LocalizationProvider>
               <GlobalLoadingOverlay />
